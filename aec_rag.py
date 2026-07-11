@@ -74,3 +74,143 @@ class AECRAG:
             print(f"✅ Generated {len(self.projects_df)} sample projects")
             return self.projects_df
 
+
+    def prepare_documents(self):
+            """
+            Prepare documents from project data for embedding
+            Each project becomes a searchable document
+            """
+            print("📝 Preparing documents for indexing...")
+            
+            documents = []
+            metadatas = []
+            ids = []
+            
+            for idx, row in self.projects_df.iterrows():
+                # Create a comprehensive text description for each project
+                doc_text = f"""
+                Project ID: {row['project_id']}
+                Project Name: {row['project_name']}
+                Status: {row['status']}
+                Department: {row['department']}
+                Start Date: {row['start_date']}
+                End Date: {row['end_date']}
+                Budget: ${row['budget']:,.2f}
+                Actual Cost: ${row['actual_cost']:,.2f}
+                Completion: {row['completion_percentage']}%
+                Project Manager: {row['project_manager']}
+                Priority: {row['priority']}
+                Description: {row['description']}
+                Cost Variance: ${row['cost_variance']:,.2f}
+                """
+                
+                documents.append(doc_text.strip())
+                metadatas.append({
+                    'project_id': row['project_id'],
+                    'status': row['status'],
+                    'budget': row['budget'],
+                    'actual_cost': row['actual_cost'],
+                    'completion_percentage': row['completion_percentage']
+                })
+                ids.append(row['project_id'])
+            
+            print(f"✅ Prepared {len(documents)} documents")
+            return documents, metadatas, ids
+
+    def generate_embeddings(self, texts):
+            """
+            Generate embeddings using Ollama
+            """
+            print("🧠 Generating embeddings using Ollama...")
+            embeddings = []
+            
+            for text in texts:
+                try:
+                    # Use Ollama to generate embeddings
+                    response = ollama.embeddings(
+                        model="nomic-embed-text",  # Good for embeddings
+                        prompt=text
+                    )
+                    embeddings.append(response['embedding'])
+                except Exception as e:
+                    print(f"❌ Error generating embedding: {e}")
+                    # Use fallback embedding
+                    embeddings.append([0.0] * 768)  # Default dimension
+            
+            print(f"✅ Generated {len(embeddings)} embeddings")
+            return embeddings
+
+    def index_projects(self):
+            """
+            Main indexing function - prepare and store project data
+            """
+            print("📚 Indexing projects into vector database...")
+            
+            # Prepare documents
+            documents, metadatas, ids = self.prepare_documents()
+            
+            # Generate embeddings
+            embeddings = self.generate_embeddings(documents)
+            
+            # Add to ChromaDB
+            try:
+                self.collection.add(
+                    embeddings=embeddings,
+                    documents=documents,
+                    metadatas=metadatas,
+                    ids=ids
+                )
+                print(f"✅ Successfully indexed {len(documents)} projects")
+                return True
+            except Exception as e:
+                print(f"❌ Error indexing projects: {e}")
+                return False
+        
+
+    def query(self, question, n_results=3):
+        """
+        Query the RAG system with a natural language question
+        """
+        print(f"🔍 Processing query: '{question}'")
+        
+        try:
+            # Generate embedding for the question
+            query_embedding = ollama.embeddings(
+                model="nomic-embed-text",
+                prompt=question
+            )['embedding']
+            
+            # Search for relevant documents
+            results = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=n_results
+            )
+            
+            # Extract relevant documents and context
+            relevant_docs = []
+            for i, doc in enumerate(results['documents'][0]):
+                relevant_docs.append({
+                    'project_id': results['ids'][0][i],
+                    'content': doc,
+                    'metadata': results['metadatas'][0][i],
+                    'distance': results['distances'][0][i] if 'distances' in results else None
+                })
+            
+            # Generate response using Ollama
+            response = self.generate_response(question, relevant_docs)
+            
+            return {
+                'question': question,
+                'response': response,
+                'relevant_docs': relevant_docs,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            print(f"❌ Error processing query: {e}")
+            return {
+                'question': question,
+                'response': f"Error: {str(e)}",
+                'relevant_docs': [],
+                'timestamp': datetime.now().isoformat()
+            }
