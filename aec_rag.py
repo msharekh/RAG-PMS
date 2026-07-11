@@ -214,3 +214,48 @@ class AECRAG:
                 'relevant_docs': [],
                 'timestamp': datetime.now().isoformat()
             }
+        
+
+
+
+
+    def generate_response(self, question, relevant_docs):
+        """
+        Generate natural language response using Ollama
+        """
+        if not relevant_docs:
+            return "No relevant project information found for your question."
+        
+        # Prepare context from relevant documents
+        context = "Here are the relevant projects based on your query:\n\n"
+        for i, doc in enumerate(relevant_docs, 1):
+            context += f"Project {i}:\n{doc['content']}\n\n"
+        
+        # Create prompt for Ollama
+        prompt = f"""You are AEC-RAG, an AI assistant for project managers in the Architecture, Engineering, and Construction industry.
+        
+Question: {question}
+
+Based on the following project information, provide a detailed answer. Focus on project status, budget, costs, and timelines.
+
+Context:
+{context}
+
+Please provide a professional and helpful response that directly answers the question. If there are multiple relevant projects, summarize the key information. If the question asks for specific metrics (like budget or completion status), provide those clearly.
+
+Answer:"""
+        
+        try:
+            # Generate response using Ollama
+            response = ollama.chat(
+                model="llama3.2",  # Use any model you have pulled
+                messages=[
+                    {"role": "system", "content": "You are a helpful project management assistant."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            return response['message']['content']
+            
+        except Exception as e:
+            return f"Error generating response: {str(e)}"
