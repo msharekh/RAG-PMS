@@ -55,6 +55,12 @@ Summary: Community contributed LangChain integrations.
 Location: C:\Users\Personal\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages
 Requires: aiohttp, httpx-sse, langchain-classic, langchain-core, langsmith, numpy, pydantic-settings, pyyaml, requests, sqlalchemy, tenacity
 
+Name: Flask
+Version: 3.1.3
+Summary: A simple framework for building complex web applications.
+License-Expression: BSD-3-Clause
+Location: C:\Users\Personal\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages
+Requires: blinker, click, itsdangerous, jinja2, markupsafe, werkzeug
 
 
 Complete Flow Diagram

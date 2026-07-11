@@ -323,24 +323,24 @@ Answer:"""
 
 
 
-    def main():
-        """
-        Main function to run the AEC-RAG system
-        """
-        print("🏗️  AEC-RAG v1.0 Setup")
-        print("="*60)
-        
-        # Initialize the RAG system
-        rag = AECRAG()
-        
-        # Generate sample data
-        rag.generate_sample_data(100)
-        
-        # Index projects
-        rag.index_projects()
-        
-        # Start CLI interface
-        rag.run_cli()
+def main():
+    """
+    Main function to run the AEC-RAG system
+    """
+    print("🏗️  AEC-RAG v1.0 Setup")
+    print("="*60)
+    
+    # Initialize the RAG system
+    rag = AECRAG()
+    
+    # Generate sample data
+    rag.generate_sample_data(100)
+    
+    # Index projects
+    rag.index_projects()
+    
+    # Start CLI interface
+    rag.run_cli()
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
