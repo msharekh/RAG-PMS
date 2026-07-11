@@ -259,3 +259,6 @@ Answer:"""
             
         except Exception as e:
             return f"Error generating response: {str(e)}"
+        
+
+        # fix unformated text
