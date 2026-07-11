@@ -54,3 +54,71 @@ Version: 0.4.2
 Summary: Community contributed LangChain integrations.
 Location: C:\Users\Personal\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages
 Requires: aiohttp, httpx-sse, langchain-classic, langchain-core, langsmith, numpy, pydantic-settings, pyyaml, requests, sqlalchemy, tenacity
+
+
+
+Complete Flow Diagram
+text
+1. START
+   ↓
+2. Create AECRAG System
+   ↓
+3. Generate 100 Sample Projects
+   ↓
+4. Convert Projects to Text (prepare_documents)
+   ↓
+5. Create Embeddings (generate_embeddings)
+   ↓
+6. Store in ChromaDB (index_projects)
+   ↓
+7. User Asks Question
+   ↓
+8. Convert Question to Embedding
+   ↓
+9. Find Similar Projects (query)
+   ↓
+10. Send to AI Model (generate_response)
+   ↓
+11. Display Answer to User
+Memory Usage Breakdown
+text
+Ollama llama3.2 model:    ~2.5 GB RAM
+Ollama embedding model:    ~1.5 GB RAM
+ChromaDB storage:          ~100 MB
+Python overhead:          ~200 MB
+Total:                    ~4.3 GB (under 8GB limit)
+
+
+
+Key Concepts for Beginners
+What is RAG?
+Retrieval Augmented Generation
+
+Retrieval: Find relevant documents (projects)
+
+Augmented: Add this info to the prompt
+
+Generation: AI generates answer based on this
+
+Why Use Ollama?
+Runs locally (no internet needed)
+
+Free and private
+
+Works on modest hardware
+
+Why ChromaDB?
+Lightweight vector database
+
+Fast similarity search
+
+Works in-memory (fast for POC)
+
+The "Less Code" Approach
+~200 lines total
+
+Each function does one thing
+
+Clear comments throughout
+
+No complex frameworks

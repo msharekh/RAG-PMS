@@ -261,4 +261,86 @@ Answer:"""
             return f"Error generating response: {str(e)}"
         
 
-        # fix unformated text
+        # fix unformated text .. please
+
+    def run_cli(self):
+        """
+        Run the command-line interface for the RAG system
+        """
+        print("\n" + "="*60)
+        print("🏗️  AEC-RAG - Project Management Assistant")
+        print("="*60)
+        print("Type 'exit' to quit, 'help' for assistance")
+        print("Example questions:")
+        print("- What is the status of all projects?")
+        print("- Show me projects with budget over $1M")
+        print("- Which projects are behind schedule?")
+        print("- What's the total cost variance?")
+        print("- Show me projects managed by Manager A")
+        print("="*60 + "\n")
+        
+        while True:
+            try:
+                question = input("🔍 Ask about your projects: ").strip()
+                
+                if question.lower() in ['exit', 'quit', 'bye']:
+                    print("👋 Goodbye!")
+                    break
+                elif question.lower() in ['help', '?']:
+                    print("\n📌 Help:")
+                    print("  - Ask questions about project status, budget, costs")
+                    print("  - Be specific for better results")
+                    print("  - The system will search 100 projects for answers")
+                    print("  - Type 'exit' to quit\n")
+                    continue
+                elif not question:
+                    continue
+                
+                # Process the query
+                start_time = time.time()
+                result = self.query(question)
+                elapsed_time = time.time() - start_time
+                
+                # Display results
+                print("\n" + "="*60)
+                print("📋 Response: (Generated in {:.2f}s)".format(elapsed_time))
+                print("="*60)
+                print(result['response'])
+                
+                # Show relevant projects referenced
+                if result['relevant_docs']:
+                    print("\n📎 Referenced Projects:")
+                    for doc in result['relevant_docs']:
+                        print(f"  • {doc['project_id']} - {doc['metadata'].get('status', 'Status unknown')}")
+                
+                print("\n" + "-"*60 + "\n")
+                
+            except KeyboardInterrupt:
+                print("\n👋 Goodbye!")
+                break
+            except Exception as e:
+                print(f"\n❌ Error: {str(e)}\n")
+
+
+
+    def main():
+        """
+        Main function to run the AEC-RAG system
+        """
+        print("🏗️  AEC-RAG v1.0 Setup")
+        print("="*60)
+        
+        # Initialize the RAG system
+        rag = AECRAG()
+        
+        # Generate sample data
+        rag.generate_sample_data(100)
+        
+        # Index projects
+        rag.index_projects()
+        
+        # Start CLI interface
+        rag.run_cli()
+
+    if __name__ == "__main__":
+        main()
