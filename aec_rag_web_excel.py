@@ -1,4 +1,4 @@
-# aec_rag_web_excel.py - Web Interface with Excel File Loading
+# aec_rag_web_excel_fixed.py - Complete Working Web Interface with Excel Loading
 
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
@@ -348,14 +348,70 @@ class AECRAG:
             traceback.print_exc()
             return False
     
-    def query(self, question, n_results=3):
+    def query(self, question, n_results=100):
         """
         Query the RAG system with a natural language question
+        Returns up to 100 projects by default
+        Special handling for status queries
         """
         print(f"🔍 Processing query: '{question}'")
         
         try:
-            # Generate embedding for the question
+            # Check if the question is asking about a specific status
+            status_keywords = ['completed', 'in progress', 'planning', 'review', 'on hold']
+            detected_status = None
+            
+            question_lower = question.lower()
+            for status in status_keywords:
+                if status in question_lower:
+                    detected_status = status
+                    break
+            
+            # If a status is detected and we have data, filter by status
+            if detected_status and self.projects_df is not None:
+                print(f"📊 Detected status filter: {detected_status}")
+                filtered_df = self.projects_df[
+                    self.projects_df['status'].str.lower() == detected_status
+                ]
+                
+                if len(filtered_df) > 0:
+                    print(f"✅ Found {len(filtered_df)} {detected_status} projects")
+                    
+                    # Create detailed context from filtered projects
+                    context = f"Found {len(filtered_df)} {detected_status} projects:\n\n"
+                    for idx, row in filtered_df.iterrows():
+                        context += f"""
+                        Project ID: {row.get('project_id', 'N/A')}
+                        Project Name: {row.get('project_name', 'N/A')}
+                        Status: {row.get('status', 'N/A')}
+                        Budget: ${row.get('budget', 0):,.2f}
+                        Completion: {row.get('completion_percentage', 0)}%
+                        \n"""
+                    
+                    # Generate response using the filtered data
+                    response = self.generate_response_from_filtered_data(question, context, filtered_df)
+                    
+                    # Create relevant docs from filtered data
+                    relevant_docs = []
+                    for idx, row in filtered_df.iterrows():
+                        relevant_docs.append({
+                            'project_id': row.get('project_id', 'N/A'),
+                            'metadata': {
+                                'status': row.get('status', 'N/A'),
+                                'budget': row.get('budget', 0),
+                                'actual_cost': row.get('actual_cost', 0),
+                                'completion_percentage': row.get('completion_percentage', 0)
+                            }
+                        })
+                    
+                    return {
+                        'question': question,
+                        'response': response,
+                        'relevant_docs': relevant_docs,
+                        'timestamp': datetime.now().isoformat()
+                    }
+            
+            # If no status filter or no results, use regular RAG search
             try:
                 query_embedding = ollama.embeddings(
                     model=self.embedding_model,
@@ -370,7 +426,7 @@ class AECRAG:
                     'timestamp': datetime.now().isoformat()
                 }
             
-            # Search for relevant documents
+            # Search for relevant documents - Return more results
             results = self.collection.query(
                 query_embeddings=[query_embedding],
                 n_results=n_results
@@ -404,6 +460,61 @@ class AECRAG:
                 'relevant_docs': [],
                 'timestamp': datetime.now().isoformat()
             }
+    
+    def generate_response_from_filtered_data(self, question, context, filtered_df):
+        """
+        Generate response from filtered data (all projects of a specific status)
+        """
+        total_projects = len(filtered_df)
+        avg_budget = filtered_df['budget'].mean()
+        avg_completion = filtered_df['completion_percentage'].mean()
+        total_budget = filtered_df['budget'].sum()
+        total_cost = filtered_df['actual_cost'].sum()
+        
+        status = filtered_df['status'].iloc[0] if len(filtered_df) > 0 else "Unknown"
+        
+        # Create a list of all project IDs
+        project_ids = filtered_df['project_id'].tolist()
+        project_list = ", ".join(project_ids[:20])  # Show first 20
+        if len(project_ids) > 20:
+            project_list += f" and {len(project_ids) - 20} more..."
+        
+        prompt = f"""You are AEC-RAG, an AI assistant for project managers.
+
+The user asks: {question}
+
+Here is the project information for all {total_projects} {status} projects:
+
+{context}
+
+Statistics:
+- Total {status} Projects: {total_projects}
+- Average Budget: ${avg_budget:,.2f}
+- Average Completion: {avg_completion:.1f}%
+- Total Budget: ${total_budget:,.2f}
+- Total Actual Cost: ${total_cost:,.2f}
+
+Project IDs: {project_list}
+
+Please provide a comprehensive summary of these projects. Include:
+1. Total number of {status} projects ({total_projects})
+2. Key statistics (budget, completion, costs)
+3. List of all project IDs
+4. Any notable observations
+
+Answer:"""
+        
+        try:
+            response = ollama.chat(
+                model=self.chat_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful project management assistant. Provide detailed, accurate responses based on the data."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response['message']['content']
+        except Exception as e:
+            return f"Error generating response: {str(e)}"
     
     def generate_response(self, question, relevant_docs):
         """
@@ -462,11 +573,8 @@ Answer:"""
 # ==================== INITIALIZE SYSTEM ====================
 
 print("🏗️ Initializing AEC-RAG Web Interface...")
-
-# Create the RAG system with the same Excel file path
 rag = AECRAG("C:/AEC_Projects/project_data.xlsx")
 
-# Load and index data
 if not rag.load_data_from_file():
     print("❌ Could not load data")
     sys.exit(1)
@@ -487,14 +595,9 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AEC-RAG - Project Management Assistant</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -502,7 +605,6 @@ HTML_TEMPLATE = """
             align-items: center;
             padding: 20px;
         }
-        
         .container {
             background: white;
             border-radius: 20px;
@@ -514,7 +616,6 @@ HTML_TEMPLATE = """
             flex-direction: column;
             overflow: hidden;
         }
-        
         .header {
             background: linear-gradient(135deg, #2c3e50, #3498db);
             color: white;
@@ -525,281 +626,46 @@ HTML_TEMPLATE = """
             border-bottom: 3px solid #e74c3c;
             flex-shrink: 0;
         }
-        
-        .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-        }
-        
-        .header h1 span {
-            color: #f1c40f;
-        }
-        
-        .header-info {
-            display: flex;
-            gap: 20px;
-            font-size: 14px;
-            opacity: 0.9;
-        }
-        
-        .header-info .badge {
-            background: rgba(255,255,255,0.2);
-            padding: 5px 12px;
-            border-radius: 20px;
-        }
-        
-        .chat-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            background: #f8f9fa;
-        }
-        
-        .message {
-            margin-bottom: 15px;
-            animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .message.user {
-            text-align: right;
-        }
-        
-        .message .bubble {
-            display: inline-block;
-            padding: 12px 20px;
-            border-radius: 15px;
-            max-width: 80%;
-            word-wrap: break-word;
-            text-align: left;
-        }
-        
-        .message.user .bubble {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-        }
-        
-        .message.assistant .bubble {
-            background: white;
-            color: #2c3e50;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .message .sources {
-            margin-top: 10px;
-            font-size: 13px;
-            background: #ecf0f1;
-            padding: 10px 15px;
-            border-radius: 10px;
-            display: inline-block;
-            width: 100%;
-        }
-        
-        .message .sources strong {
-            color: #2c3e50;
-        }
-        
-        .message .sources .source-item {
-            color: #3498db;
-            margin: 3px 0;
-            font-size: 12px;
-        }
-        
-        .input-container {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            gap: 10px;
-            flex-shrink: 0;
-        }
-        
-        .input-container input {
-            flex: 1;
-            padding: 12px 20px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-        
-        .input-container input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
-        }
-        
-        .input-container input:disabled {
-            opacity: 0.6;
-        }
-        
-        .input-container button {
-            padding: 12px 30px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-        
-        .input-container button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .input-container button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .quick-questions {
-            padding: 10px 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            flex-shrink: 0;
-        }
-        
-        .quick-questions button {
-            padding: 6px 15px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.3s;
-            color: #2c3e50;
-        }
-        
-        .quick-questions button:hover {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        
-        .typing-indicator {
-            display: none;
-            padding: 10px 20px;
-            background: white;
-            border-radius: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .typing-indicator.active {
-            display: inline-block;
-        }
-        
-        .stats-bar {
-            background: #ecf0f1;
-            padding: 8px 20px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
-            color: #7f8c8d;
-            border-top: 1px solid #ddd;
-            flex-shrink: 0;
-        }
-        
-        .chat-container::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        .chat-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        
-        .chat-container::-webkit-scrollbar-thumb {
-            background: #667eea;
-            border-radius: 3px;
-        }
-        
-        .chat-container::-webkit-scrollbar-thumb:hover {
-            background: #764ba2;
-        }
-        
-        .error-message {
-            color: #e74c3c;
-            background: #fdf0ef;
-            padding: 10px;
-            border-radius: 10px;
-            border-left: 4px solid #e74c3c;
-        }
-        
-        .file-info {
-            background: #e8f4f8;
-            padding: 8px 20px;
-            font-size: 12px;
-            color: #2c3e50;
-            border-bottom: 1px solid #d4e6f0;
-            display: flex;
-            justify-content: space-between;
-            flex-shrink: 0;
-        }
-        
-        .file-info span {
-            font-family: monospace;
-            font-size: 12px;
-            color: #3498db;
-        }
-        
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .header h1 span { color: #f1c40f; }
+        .header-info { display: flex; gap: 20px; font-size: 14px; opacity: 0.9; }
+        .header-info .badge { background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; }
+        .chat-container { flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; }
+        .message { margin-bottom: 15px; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { text-align: right; }
+        .message .bubble { display: inline-block; padding: 12px 20px; border-radius: 15px; max-width: 80%; word-wrap: break-word; text-align: left; }
+        .message.user .bubble { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .message.assistant .bubble { background: white; color: #2c3e50; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .message .sources { margin-top: 10px; font-size: 13px; background: #ecf0f1; padding: 10px 15px; border-radius: 10px; display: inline-block; width: 100%; }
+        .message .sources strong { color: #2c3e50; }
+        .message .sources .source-item { color: #3498db; margin: 3px 0; font-size: 12px; }
+        .input-container { padding: 20px; background: white; border-top: 1px solid #e0e0e0; display: flex; gap: 10px; flex-shrink: 0; }
+        .input-container input { flex: 1; padding: 12px 20px; border: 2px solid #e0e0e0; border-radius: 25px; font-size: 16px; transition: all 0.3s; }
+        .input-container input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 10px rgba(102,126,234,0.2); }
+        .input-container input:disabled { opacity: 0.6; }
+        .input-container button { padding: 12px 30px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 25px; font-size: 16px; cursor: pointer; transition: all 0.3s; font-weight: 600; white-space: nowrap; }
+        .input-container button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
+        .input-container button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .quick-questions { padding: 10px 20px; background: #f8f9fa; border-top: 1px solid #e0e0e0; display: flex; gap: 10px; flex-wrap: wrap; flex-shrink: 0; }
+        .quick-questions button { padding: 6px 15px; background: white; border: 1px solid #ddd; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; color: #2c3e50; }
+        .quick-questions button:hover { background: #667eea; color: white; border-color: #667eea; }
+        .stats-bar { background: #ecf0f1; padding: 8px 20px; display: flex; justify-content: space-between; font-size: 13px; color: #7f8c8d; border-top: 1px solid #ddd; flex-shrink: 0; }
+        .chat-container::-webkit-scrollbar { width: 6px; }
+        .chat-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .chat-container::-webkit-scrollbar-thumb { background: #667eea; border-radius: 3px; }
+        .chat-container::-webkit-scrollbar-thumb:hover { background: #764ba2; }
+        .file-info { background: #e8f4f8; padding: 8px 20px; font-size: 12px; color: #2c3e50; border-bottom: 1px solid #d4e6f0; display: flex; justify-content: space-between; flex-shrink: 0; }
+        .file-info span { font-family: monospace; font-size: 12px; color: #3498db; }
         @media (max-width: 768px) {
-            .container {
-                height: 100vh;
-                border-radius: 0;
-            }
-            
-            .header {
-                padding: 15px;
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .header h1 {
-                font-size: 20px;
-            }
-            
-            .header-info {
-                font-size: 12px;
-                flex-wrap: wrap;
-                justify-content: center;
-            }
-            
-            .message .bubble {
-                max-width: 90%;
-            }
-            
-            .quick-questions {
-                display: none;
-            }
-            
-            .input-container button {
-                padding: 12px 20px;
-                font-size: 14px;
-            }
-            
-            .file-info {
-                font-size: 10px;
-                flex-direction: column;
-                align-items: center;
-                gap: 5px;
-            }
+            .container { height: 100vh; border-radius: 0; }
+            .header { padding: 15px; flex-direction: column; gap: 10px; }
+            .header h1 { font-size: 20px; }
+            .header-info { font-size: 12px; flex-wrap: wrap; justify-content: center; }
+            .message .bubble { max-width: 90%; }
+            .quick-questions { display: none; }
+            .input-container button { padding: 12px 20px; font-size: 14px; }
+            .file-info { font-size: 10px; flex-direction: column; align-items: center; gap: 5px; }
         }
     </style>
 </head>
@@ -813,119 +679,94 @@ HTML_TEMPLATE = """
                 <span class="badge">🟢 Online</span>
             </div>
         </div>
-        
         <div class="file-info">
             <span>📁 Data Source: {{ data_file }}</span>
             <span>📅 Last Updated: {{ last_updated }}</span>
         </div>
-        
         <div class="chat-container" id="chatContainer">
             <div class="message assistant">
                 <div class="bubble">
                     <strong>👋 Welcome to AEC-RAG!</strong><br><br>
                     I'm your project management assistant. I can help you query your project data using natural language.<br><br>
                     <strong>Try asking me:</strong><br>
+                    • Show me completed projects<br>
                     • What projects are over budget?<br>
                     • Show me high priority projects<br>
                     • What is the total budget?<br>
-                    • Which projects are behind schedule?<br><br>
-                    <strong>📁 Data File:</strong> {{ data_file }}
+                    • Which projects are behind schedule?
                 </div>
             </div>
         </div>
-        
         <div class="quick-questions">
+            <button onclick="askQuestion('Show me completed projects')">✅ Completed</button>
             <button onclick="askQuestion('What projects are over budget?')">💰 Over Budget</button>
             <button onclick="askQuestion('Show me high priority projects')">⚡ High Priority</button>
             <button onclick="askQuestion('What is the total budget?')">📊 Total Budget</button>
             <button onclick="askQuestion('Which projects are behind schedule?')">📅 Behind Schedule</button>
-            <button onclick="askQuestion('Show me completed projects')">✅ Completed</button>
-            <button onclick="askQuestion('Reload data from Excel file')">🔄 Reload</button>
         </div>
-        
         <div class="stats-bar">
             <span>💬 Ask any question about your projects</span>
             <span>⚡ Fast responses • 🔒 Private • 🏠 Local</span>
         </div>
-        
         <div class="input-container">
             <input type="text" id="questionInput" placeholder="Ask about your projects..." onkeypress="handleKeyPress(event)">
             <button id="sendButton" onclick="sendQuestion()">Send 🚀</button>
         </div>
     </div>
-    
     <script>
-        // Get elements
-        var chatContainer = document.getElementById('chatContainer');
-        var questionInput = document.getElementById('questionInput');
-        var sendButton = document.getElementById('sendButton');
+        var chatContainer = document.getElementById("chatContainer");
+        var questionInput = document.getElementById("questionInput");
+        var sendButton = document.getElementById("sendButton");
         
-        // Load initial stats
         async function loadStats() {
             try {
-                var response = await fetch('/api/stats');
+                var response = await fetch("/api/stats");
                 if (response.ok) {
                     var data = await response.json();
-                    document.getElementById('projectCount').textContent = '📊 ' + data.total_projects + ' Projects';
+                    document.getElementById("projectCount").textContent = "📊 " + data.total_projects + " Projects";
                 }
             } catch (error) {
-                console.error('Error loading stats:', error);
+                console.error("Error loading stats:", error);
             }
         }
-        
-        // Load stats on page load
         loadStats();
         
-        // Add a message to the chat
         function addMessage(text, sender, sources) {
-            var messageDiv = document.createElement('div');
-            messageDiv.className = 'message ' + sender;
-            
-            var bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            
-            // Format text with line breaks
-            var formattedText = text.replace(/\\n/g, '<br>');
+            var messageDiv = document.createElement("div");
+            messageDiv.className = "message " + sender;
+            var bubble = document.createElement("div");
+            bubble.className = "bubble";
+            var formattedText = text.replace(/\\n/g, "<br>");
             bubble.innerHTML = formattedText;
-            
             messageDiv.appendChild(bubble);
-            
-            // Add sources if available
             if (sources && sources.length > 0) {
-                var sourcesDiv = document.createElement('div');
-                sourcesDiv.className = 'sources';
-                sourcesDiv.innerHTML = '<strong>📎 Referenced Projects:</strong><br>';
+                var sourcesDiv = document.createElement("div");
+                sourcesDiv.className = "sources";
+                sourcesDiv.innerHTML = "<strong>📎 Referenced Projects:</strong><br>";
                 for (var i = 0; i < sources.length; i++) {
                     var source = sources[i];
-                    var status = source.metadata ? source.metadata.status : 'Unknown';
-                    sourcesDiv.innerHTML += '<div class="source-item">• ' + source.project_id + ' - ' + status + '</div>';
+                    var status = source.metadata ? source.metadata.status : "Unknown";
+                    sourcesDiv.innerHTML += '<div class="source-item">• ' + source.project_id + " - " + status + "</div>";
                 }
                 messageDiv.appendChild(sourcesDiv);
             }
-            
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
         
-        // Show typing indicator
         function showTyping() {
-            // Remove existing typing indicator
             removeTyping();
-            
-            var typingDiv = document.createElement('div');
-            typingDiv.className = 'message assistant';
-            typingDiv.id = 'typingIndicator';
-            
-            var bubble = document.createElement('div');
-            bubble.className = 'bubble';
+            var typingDiv = document.createElement("div");
+            typingDiv.className = "message assistant";
+            typingDiv.id = "typingIndicator";
+            var bubble = document.createElement("div");
+            bubble.className = "bubble";
             bubble.innerHTML = '<div style="display: inline-block;"><span style="display: inline-block; width: 8px; height: 8px; background: #667eea; border-radius: 50%; margin: 0 3px; animation: typing 1.4s infinite;"></span><span style="display: inline-block; width: 8px; height: 8px; background: #667eea; border-radius: 50%; margin: 0 3px; animation: typing 1.4s infinite; animation-delay: 0.2s;"></span><span style="display: inline-block; width: 8px; height: 8px; background: #667eea; border-radius: 50%; margin: 0 3px; animation: typing 1.4s infinite; animation-delay: 0.4s;"></span></div><span style="margin-left: 10px; color: #7f8c8d;">Thinking...</span>';
-            
             typingDiv.appendChild(bubble);
             chatContainer.appendChild(typingDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
         
-        // Remove typing indicator
         function removeTyping() {
             var typing = document.getElementById('typingIndicator');
             if (typing) {
@@ -933,31 +774,19 @@ HTML_TEMPLATE = """
             }
         }
         
-        // Send question to backend
         async function sendQuestion() {
             var question = questionInput.value.trim();
             if (!question) return;
             
-            // Check if it's a reload command
-            if (question.toLowerCase() === 'reload data from excel file') {
-                await reloadData();
-                return;
-            }
-            
-            // Disable input
             questionInput.disabled = true;
             sendButton.disabled = true;
             questionInput.style.opacity = '0.6';
             
-            // Add user message
             addMessage(question, 'user', null);
             questionInput.value = '';
-            
-            // Show typing indicator
             showTyping();
             
             try {
-                // Send to API
                 var response = await fetch('/api/query', {
                     method: 'POST',
                     headers: {
@@ -966,7 +795,6 @@ HTML_TEMPLATE = """
                     body: JSON.stringify({ question: question })
                 });
                 
-                // Remove typing indicator
                 removeTyping();
                 
                 if (!response.ok) {
@@ -976,53 +804,24 @@ HTML_TEMPLATE = """
                 
                 var data = await response.json();
                 
-                // Check if there was an error in the response
                 if (data.error) {
                     addMessage('❌ ' + data.error, 'assistant', null);
                 } else {
-                    // Add assistant response
                     addMessage(data.response || 'No response generated', 'assistant', data.relevant_docs);
                 }
                 
             } catch (error) {
                 removeTyping();
-                addMessage('❌ Error: ' + error.message + '. Please check the server console for details.', 'assistant', null);
+                addMessage('❌ Error: ' + error.message, 'assistant', null);
                 console.error('Error:', error);
             }
             
-            // Enable input
             questionInput.disabled = false;
             sendButton.disabled = false;
             questionInput.style.opacity = '1';
             questionInput.focus();
         }
         
-        // Reload data from Excel file
-        async function reloadData() {
-            addMessage('🔄 Reloading data from Excel file...', 'user', null);
-            
-            try {
-                var response = await fetch('/api/reload', {
-                    method: 'POST'
-                });
-                
-                if (!response.ok) {
-                    var errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to reload');
-                }
-                
-                var data = await response.json();
-                addMessage('✅ ' + data.message, 'assistant', null);
-                
-                // Update stats
-                loadStats();
-                
-            } catch (error) {
-                addMessage('❌ Error reloading data: ' + error.message, 'assistant', null);
-            }
-        }
-        
-        // Handle Enter key
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -1030,13 +829,11 @@ HTML_TEMPLATE = """
             }
         }
         
-        // Quick question button
         function askQuestion(question) {
             questionInput.value = question;
             sendQuestion();
         }
         
-        // Auto-focus input on load
         window.onload = function() {
             questionInput.focus();
         };
@@ -1050,17 +847,8 @@ HTML_TEMPLATE = """
 @app.route('/')
 def home():
     """Render the main page"""
-    # Get file modification time
-    last_updated = "Unknown"
-    if os.path.exists(rag.data_file_path):
-        mod_time = os.path.getmtime(rag.data_file_path)
-        last_updated = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
     
-    return render_template_string(
-        HTML_TEMPLATE,
-        data_file=rag.data_file_path,
-        last_updated=last_updated
-    )
+    return render_template_string(HTML_TEMPLATE)
 
 @app.route('/api/query', methods=['POST'])
 def api_query():
@@ -1068,10 +856,6 @@ def api_query():
     try:
         data = request.json
         question = data.get('question', '')
-        
-        # Check for reload command
-        if question.lower() == 'reload data from excel file':
-            return jsonify({'message': 'Use /api/reload endpoint'})
         
         if not question:
             return jsonify({'error': 'No question provided'}), 400
@@ -1091,25 +875,19 @@ def api_stats():
         if rag.projects_df is None:
             return jsonify({'error': 'No data loaded'}), 404
         
-        stats = rag.show_project_stats()
+        stats = {
+            'total_projects': len(rag.projects_df),
+            'status_distribution': rag.projects_df['status'].value_counts().to_dict(),
+            'average_budget': float(rag.projects_df['budget'].mean()),
+            'average_completion': float(rag.projects_df['completion_percentage'].mean()),
+            'total_budget': float(rag.projects_df['budget'].sum()),
+            'total_cost': float(rag.projects_df['actual_cost'].sum())
+        }
+        
         return jsonify(stats)
         
     except Exception as e:
         print(f"❌ Stats Error: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reload', methods=['POST'])
-def api_reload():
-    """Reload data from Excel file"""
-    try:
-        if rag.load_data_from_file():
-            rag.index_projects()
-            return jsonify({'message': 'Data reloaded successfully from Excel file!'})
-        else:
-            return jsonify({'error': 'Failed to reload data'}), 400
-    except Exception as e:
-        print(f"❌ Reload Error: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1120,7 +898,7 @@ if __name__ == '__main__':
     print("🌐 AEC-RAG Web Interface")
     print("="*60)
     print(f"📍 URL: http://localhost:5000")
-    print(f"📁 Data File: {rag.data_file_path}")
+    print(f"📁 Data: {rag.data_file_path}")
     print(f"📊 Projects: {len(rag.projects_df) if rag.projects_df is not None else 0}")
     print("="*60)
     print("\n🚀 Starting web server...")
