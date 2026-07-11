@@ -7,6 +7,11 @@ import random               # For generating sample data
 from datetime import datetime, timedelta  # For date handling
 import time                 # For timing operations
 
+import os
+import sys
+import subprocess
+
+
 
 class AECRAG:
     """AEC-RAG: Simple Project Management RAG System"""
@@ -15,11 +20,14 @@ class AECRAG:
         """Initialize the RAG system"""
         print("🚀 Initializing AEC-RAG System...")
         
-        # Initialize ChromaDB client with in-memory storage
-        self.client = chromadb.Client(Settings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=None  # In-memory mode
-        ))
+        # # Initialize ChromaDB client with in-memory storage
+        # self.client = chromadb.Client(Settings(
+        #     chroma_db_impl="duckdb+parquet",
+        #     persist_directory=None  # In-memory mode
+        # ))
+         # Initialize ChromaDB client with in-memory storage (FIXED)
+        # Using ephemeral (in-memory) client to avoid persist_directory issues
+        self.client = chromadb.EphemeralClient()
 
         # Create or get collection for project data
         self.collection = self.client.get_or_create_collection(
@@ -31,6 +39,87 @@ class AECRAG:
         self.projects_df = None
         
         print("✅ AEC-RAG initialized successfully!")
+        
+        
+        
+    def ensure_models_available(self):
+        """
+        Check if required Ollama models are available, pull if not
+        """
+        print("🔍 Checking Ollama models...")
+        
+        try:
+            # Get list of installed models
+            installed_models = self.get_installed_models()
+            
+            # Check embedding model
+            if self.embedding_model not in installed_models:
+                print(f"📦 Pulling embedding model: {self.embedding_model}...")
+                self.pull_model(self.embedding_model)
+            else:
+                print(f"✅ Embedding model available: {self.embedding_model}")
+            
+            # Check chat model
+            if self.chat_model not in installed_models:
+                print(f"📦 Pulling chat model: {self.chat_model}...")
+                self.pull_model(self.chat_model)
+            else:
+                print(f"✅ Chat model available: {self.chat_model}")
+                
+        except Exception as e:
+            print(f"⚠️ Error checking models: {e}")
+            print("📌 Please ensure Ollama is running and models are available")
+            print("📌 You can manually pull models with:")
+            print(f"    ollama pull {self.embedding_model}")
+            print(f"    ollama pull {self.chat_model}")
+    
+    def get_installed_models(self):
+        """
+        Get list of installed Ollama models
+        """
+        try:
+            # Use ollama list command
+            result = subprocess.run(['ollama', 'list'], capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # Parse the output to get model names
+                lines = result.stdout.strip().split('\n')
+                models = []
+                for line in lines[1:]:  # Skip header
+                    if line.strip():
+                        model_name = line.split()[0]
+                        models.append(model_name)
+                return models
+            else:
+                print(f"⚠️ Could not get model list: {result.stderr}")
+                return []
+        except Exception as e:
+            print(f"⚠️ Error getting installed models: {e}")
+            return []
+    
+    def pull_model(self, model_name):
+        """
+        Pull an Ollama model
+        """
+        print(f"⬇️ Pulling {model_name}... This may take a few minutes...")
+        
+        try:
+            # Use ollama pull command
+            result = subprocess.run(['ollama', 'pull', model_name], 
+                                  capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print(f"✅ Successfully pulled {model_name}")
+                return True
+            else:
+                print(f"❌ Failed to pull {model_name}: {result.stderr}")
+                print(f"📌 Please manually pull with: ollama pull {model_name}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error pulling {model_name}: {e}")
+            print(f"📌 Please manually pull with: ollama pull {model_name}")
+            return False
 
     def generate_sample_data(self, num_projects=100):
         
