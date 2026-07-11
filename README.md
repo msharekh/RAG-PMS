@@ -1,11 +1,11 @@
 # RAG-PMS
 
 ## Technologies Used
-Python 3.8+ - Core programming language
-Ollama - Local LLM for embeddings and text generation
--ChromaDB - Lightweight vector database (in-memory)
-LangChain - Framework for RAG pipeline (optional but helpful)
-Pandas - Data manipulation
+1. Python 3.8+ - Core programming language
+1. Ollama - Local LLM for embeddings and text generation
+1. ChromaDB - Lightweight vector database (in-memory)
+1. LangChain - Framework for RAG pipeline (optional but helpful)
+1. Pandas - Data manipulation
 
 packages:
 
