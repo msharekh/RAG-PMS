@@ -1031,3 +1031,10 @@ Clear comments throughout
 No complex frameworks
 -------------------------------
 
+# Deployment Guide
+
+1. Extract the package on the production host.
+2. Copy the example environment file: `cp .env.example .env`
+3. Edit `.env` and fill in production secrets.
+4. Launch the application stack: `docker compose up -d`
+5. Verify containers are healthy: `docker compose ps`
