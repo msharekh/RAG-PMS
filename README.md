@@ -902,6 +902,8 @@ exit         # Quit
 
 
 pip install ollama chromadb pandas langchain langchain-community sentence-transformers
+pip show <package_name>
+pip show ollama chromadb pandas langchain langchain-community sentence-transformers flask
 
 packages:
 

@@ -13,6 +13,8 @@ import sys
 import subprocess
 import traceback
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
@@ -109,9 +111,11 @@ class AECRAG:
         
         try:
             # Use ollama pull command
-            result = subprocess.run(['ollama', 'pull', model_name], 
-                                  capture_output=True, text=True)
+            result = subprocess.run(["ollama", "pull", model_name], 
+                                    capture_output=True,    encoding='utf-8',     
+                                    errors='ignore', text=True)
             
+
             if result.returncode == 0:
                 print(f"✅ Successfully pulled {model_name}")
                 return True
