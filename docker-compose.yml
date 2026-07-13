@@ -8,8 +8,6 @@ services:
       - ollama_storage:/root/.ollama
     ports:
       - "11434:11434"
-    # Auto-pull the models right after the Ollama service starts up
-    entrypoint: /bin/sh -c "ollama serve & sleep 5 && ollama pull llama3.2:latest && ollama pull nomic-embed-text && tail -f /dev/null"
 
   web-app:
     build: .
@@ -20,10 +18,11 @@ services:
       - OLLAMA_HOST=http://ollama:11434
       - DATA_FILE_PATH=/data/project_data.xlsx
     volumes:
-      # Mounts a local folder named "./project_data" to /data inside the container
       - ./project_data:/data
     depends_on:
       - ollama
+    # This force-waits a few seconds to let the main Ollama service initialize its socket before Python runs
+    command: sh -c "sleep 8 && python aec_rag_web_excel.py"
 
 volumes:
   ollama_storage:

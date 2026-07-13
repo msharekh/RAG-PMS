@@ -111,26 +111,21 @@ class AECRAG:
     
     def pull_model(self, model_name):
         """
-        Pull an Ollama model
+        Pull an Ollama model using the Python API client
         """
         print(f"⬇️ Pulling {model_name}... This may take a few minutes...")
         
         try:
-            # Use ollama pull command
-            result = subprocess.run(["ollama", "pull", model_name], 
-                                    capture_output=True,    encoding='utf-8',     
-                                    errors='ignore', text=True)
+            # Connect directly via the Python client API
+            client = ollama.Client(host=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
             
-
-            if result.returncode == 0:
-                print(f"✅ Successfully pulled {model_name}")
-                return True
-            else:
-                print(f"❌ Failed to pull {model_name}: {result.stderr}")
-                return False
+            # Using client.pull directly bypasses the need for the 'ollama' CLI binary
+            response = client.pull(model=model_name)
+            print(f"✅ Successfully pulled {model_name}")
+            return True
                 
         except Exception as e:
-            print(f"❌ Error pulling {model_name}: {e}")
+            print(f"❌ Error pulling {model_name} via API: {e}")
             return False
     
     def load_data_from_file(self):

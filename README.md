@@ -1049,8 +1049,8 @@ Open a Terminal (or Command Prompt / PowerShell) in that unzipped folder.
 Run the following single command to build and launch everything:
 
 Bash
+docker compose down
 docker compose up --build
-
 ================
 
 What happens next: Docker will automatically fetch the Python environment, download Ollama, pull both llama3.2:latest and nomic-embed-text internally, process the excel file inside your ./project_data folder, and spin up the web client.
