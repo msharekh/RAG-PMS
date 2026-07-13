@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
-COPY aec_rag_web_excel_fixed.py .
+COPY aec_rag_web_excel.py .
 
 # Expose Flask port
 EXPOSE 5000
@@ -21,4 +21,4 @@ EXPOSE 5000
 ENV DATA_FILE_PATH="/data/project_data.xlsx"
 
 # Run the app
-CMD ["python", "aec_rag_web_excel_fixed.py"]
+CMD ["python", "aec_rag_web_excel.py"]
