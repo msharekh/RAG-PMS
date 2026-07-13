@@ -1038,3 +1038,22 @@ No complex frameworks
 3. Edit `.env` and fill in production secrets.
 4. Launch the application stack: `docker compose up -d`
 5. Verify containers are healthy: `docker compose ps`
+
+------------------------------
+
+On the Destination PC (Running):
+Requirement: Ensure Docker Desktop is installed and running on the target machine (Windows, Mac, or Linux all work identically).
+
+Open a Terminal (or Command Prompt / PowerShell) in that unzipped folder.
+
+Run the following single command to build and launch everything:
+
+Bash
+docker compose up --build
+
+================
+
+What happens next: Docker will automatically fetch the Python environment, download Ollama, pull both llama3.2:latest and nomic-embed-text internally, process the excel file inside your ./project_data folder, and spin up the web client.
+
+Once the console logs indicate completion, open any browser on the destination machine and navigate to:
+👉 http://localhost:5000

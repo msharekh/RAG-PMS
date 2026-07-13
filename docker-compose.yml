@@ -1,37 +1,29 @@
 version: '3.8'
 
 services:
-  # App Service (e.g., Python/Node API)
-  web:
-    image: your-registry.azurecr.io/app-name:latest # Use a tagged image from a registry
-    container_name: client-app-service
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-    depends_on:
-      db:
-        condition: service_healthy # Waits for DB to actually accept connections
-
-  # Database Service
-  db:
-    image: postgres:15-alpine
-    container_name: client-db-service
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aec-rag-ollama
     volumes:
-      - db_data:/var/lib/postgresql/data # Named volume for persistence
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - ollama_storage:/root/.ollama
+    ports:
+      - "11434:11434"
+    # Auto-pull the models right after the Ollama service starts up
+    entrypoint: /bin/sh -c "ollama serve & sleep 5 && ollama pull llama3.2:latest && ollama pull nomic-embed-text && tail -f /dev/null"
+
+  web-app:
+    build: .
+    container_name: aec-rag-web
+    ports:
+      - "5000:5000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - DATA_FILE_PATH=/data/project_data.xlsx
+    volumes:
+      # Mounts a local folder named "./project_data" to /data inside the container
+      - ./project_data:/data
+    depends_on:
+      - ollama
 
 volumes:
-  db_data:
-    driver: local
+  ollama_storage:

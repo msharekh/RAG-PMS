@@ -33,9 +33,15 @@ class AECRAG:
         """
         print("🚀 Initializing AEC-RAG System...")
         
-        # Set default file path if not provided
+        # # Set default file path if not provided
+        # if data_file_path is None:
+        #     self.data_file_path = "C:/AEC_Projects/project_data.xlsx"
+        # else:
+        #     self.data_file_path = data_file_path
+
+        # Look for the Docker environment variable path first, fallback to Windows local
         if data_file_path is None:
-            self.data_file_path = "C:/AEC_Projects/project_data.xlsx"
+            self.data_file_path = os.environ.get("DATA_FILE_PATH", "C:/AEC_Projects/project_data.xlsx")
         else:
             self.data_file_path = data_file_path
         
