@@ -1057,3 +1057,8 @@ What happens next: Docker will automatically fetch the Python environment, downl
 
 Once the console logs indicate completion, open any browser on the destination machine and navigate to:
 👉 http://localhost:5000
+
+****************NOTE*******************
+
+✅ Embedding model available: nomic-embed-text
+✅ Chat model available: llama3.2:latest
