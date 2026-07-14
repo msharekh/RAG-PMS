@@ -270,44 +270,63 @@ class AECRAG:
         
         return True
     
-    def prepare_documents(self):
-        """
-        Prepare documents from project data for embedding
-        """
-        self.log("📝 Preparing documents for indexing...")
+    # def prepare_documents(self):
+    #     """
+    #     Prepare documents from project data for embedding
+    #     """
+    #     self.log("📝 Preparing documents for indexing...")
         
+    #     documents = []
+    #     metadatas = []
+    #     ids = []
+        
+    #     for idx, row in self.projects_df.iterrows():
+    #         doc_text = f"""
+    #         Project ID: {row.get('project_id', 'N/A')}
+    #         Project Name: {row.get('project_name', 'N/A')}
+    #         Status: {row.get('status', 'N/A')}
+    #         Department: {row.get('department', 'N/A')}
+    #         Start Date: {row.get('start_date', 'N/A')}
+    #         End Date: {row.get('end_date', 'N/A')}
+    #         Budget: ${row.get('budget', 0):,.2f}
+    #         Actual Cost: ${row.get('actual_cost', 0):,.2f}
+    #         Completion: {row.get('completion_percentage', 0)}%
+    #         Project Manager: {row.get('project_manager', 'N/A')}
+    #         Priority: {row.get('priority', 'N/A')}
+    #         Description: {row.get('description', 'N/A')}
+    #         Cost Variance: ${row.get('cost_variance', 0):,.2f}
+    #         """
+            
+    #         documents.append(doc_text.strip())
+    #         metadatas.append({
+    #             'project_id': row.get('project_id', 'N/A'),
+    #             'status': row.get('status', 'N/A'),
+    #             'budget': row.get('budget', 0),
+    #             'actual_cost': row.get('actual_cost', 0),
+    #             'completion_percentage': row.get('completion_percentage', 0)
+    #         })
+    #         ids.append(row.get('project_id', f'PRJ-{idx}'))
+        
+    #     self.log(f"✅ Prepared {len(documents)} documents")
+    #     return documents, metadatas, ids
+
+    def prepare_documents(self):
+
+        self.log("📝 Preparing documents for indexing...")
+
         documents = []
         metadatas = []
         ids = []
-        
+
         for idx, row in self.projects_df.iterrows():
-            doc_text = f"""
-            Project ID: {row.get('project_id', 'N/A')}
-            Project Name: {row.get('project_name', 'N/A')}
-            Status: {row.get('status', 'N/A')}
-            Department: {row.get('department', 'N/A')}
-            Start Date: {row.get('start_date', 'N/A')}
-            End Date: {row.get('end_date', 'N/A')}
-            Budget: ${row.get('budget', 0):,.2f}
-            Actual Cost: ${row.get('actual_cost', 0):,.2f}
-            Completion: {row.get('completion_percentage', 0)}%
-            Project Manager: {row.get('project_manager', 'N/A')}
-            Priority: {row.get('priority', 'N/A')}
-            Description: {row.get('description', 'N/A')}
-            Cost Variance: ${row.get('cost_variance', 0):,.2f}
-            """
-            
-            documents.append(doc_text.strip())
-            metadatas.append({
-                'project_id': row.get('project_id', 'N/A'),
-                'status': row.get('status', 'N/A'),
-                'budget': row.get('budget', 0),
-                'actual_cost': row.get('actual_cost', 0),
-                'completion_percentage': row.get('completion_percentage', 0)
-            })
-            ids.append(row.get('project_id', f'PRJ-{idx}'))
-        
-        self.log(f"✅ Prepared {len(documents)} documents")
+            text = ""
+
+            for col in self.projects_df.columns:
+                text += f"{col}: {row[col]}\n"
+
+        documents.append(text)
+        self.log(f"Prepared {len(documents)} documents")
+
         return documents, metadatas, ids
     
     def generate_embeddings(self, texts):
@@ -318,7 +337,8 @@ class AECRAG:
         embeddings = []
         total = len(texts)
         
-        for i, text in enumerate(texts):
+        enumerate_texts=enumerate(texts)
+        for i, text in enumerate_texts:
             try:
                 if (i + 1) % 10 == 0 or i == total - 1:
                     self.log(f"  Processing {i+1}/{total}...")
@@ -349,6 +369,8 @@ class AECRAG:
         
         try:
             documents, metadatas, ids = self.prepare_documents()
+
+
             embeddings = self.generate_embeddings(documents)
             
             # Clear existing data
@@ -604,11 +626,11 @@ Answer:"""
 rag = AECRAG("C:/AEC_Projects/project_data.xlsx")
 
 if not rag.load_data_from_file():
-    self.log("❌ Could not load data")
+    rag.log("❌ Could not load data")
     sys.exit(1)
 
 if not rag.index_projects():
-    self.log("❌ Could not index projects")
+    rag.log("❌ Could not index projects")
     sys.exit(1)
 
 rag.log("✅ System ready!")
@@ -892,7 +914,7 @@ def api_query():
         return jsonify(result)
         
     except Exception as e:
-        self.log(f"❌ API Error: {e}")
+        rag.log(f"❌ API Error: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -915,7 +937,7 @@ def api_stats():
         return jsonify(stats)
         
     except Exception as e:
-        self.log(f"❌ Stats Error: {e}")
+        rag.log(f"❌ Stats Error: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
