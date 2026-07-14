@@ -1,15 +1,19 @@
 # aec_rag_web_excel_fixed.py - Complete Working Web Interface with Excel Loading
 
+
+import sys
+# self.log("Python executable:", sys.executable)
+# self.log("Python version:", sys.version)
+
 from flask import Flask, request, jsonify, render_template_string
-from flask_cors import CORS
 import pandas as pd
+from flask_cors import CORS
 import ollama
 import chromadb
 import os
 from datetime import datetime, timedelta
 import time
 import random
-import sys
 import subprocess
 import traceback
 
@@ -31,7 +35,9 @@ class AECRAG:
         """
         Initialize the RAG system with file-based data loading
         """
-        print("🚀 Initializing AEC-RAG System...")
+        self.start_time = time.perf_counter()
+
+        self.log("🚀 Initializing AEC-RAG System...")
         
         # # Set default file path if not provided
         # if data_file_path is None:
@@ -63,57 +69,73 @@ class AECRAG:
         
         # Store project data
         self.projects_df = None
-        
-        print(f"✅ AEC-RAG initialized! Data source: {self.data_file_path}")
+
+        self.log(f"✅ AEC-RAG initialized! Data source: {self.data_file_path}")
     
+    # def log(message):
+    #         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]  # milliseconds
+    #         elapsed = time.perf_counter() - START_TIME
+    #         self.log(f"[{timestamp}] [+{elapsed:8.3f}s] {message}")
+
+    def log(self, message, level="INFO"):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        elapsed = time.perf_counter() - self.start_time
+
+        print(
+            f"[{timestamp}] "
+            f"[+{elapsed:8.3f}s] "
+            f"[{level}] {message}",
+            flush=True
+        )
+
     def check_ollama_connection(self):
         """
         Check if Ollama is running and models are available
         """
-        print("🔍 Checking Ollama connection...")
+        self.log("🔍 Checking Ollama connection...")
         
         try:
             # Try to list models to check connection
             response = ollama.list()
-            print("✅ Ollama is running")
+            self.log("✅ Ollama is running")
             
             # Get installed models
             installed_models = [model['model'] for model in response.get('models', [])]
-            print(f"📦 Installed models: {installed_models}")
+            self.log(f"📦 Installed models: {installed_models}")
             
             # Check if required models are installed
             embedding_available = any(self.embedding_model in model for model in installed_models)
             chat_available = any(self.chat_model in model for model in installed_models)
             
             if not embedding_available:
-                print(f"⚠️ Embedding model '{self.embedding_model}' not found")
-                print(f"📌 Pulling model: ollama pull {self.embedding_model}")
+                self.log(f"⚠️ Embedding model '{self.embedding_model}' not found")
+                self.log(f"📌 Pulling model: ollama pull {self.embedding_model}")
                 self.pull_model(self.embedding_model)
             else:
-                print(f"✅ Embedding model available: {self.embedding_model}")
+                self.log(f"✅ Embedding model available: {self.embedding_model}")
             
             if not chat_available:
-                print(f"⚠️ Chat model '{self.chat_model}' not found")
-                print(f"📌 Pulling model: ollama pull {self.chat_model}")
+                self.log(f"⚠️ Chat model '{self.chat_model}' not found")
+                self.log(f"📌 Pulling model: ollama pull {self.chat_model}")
                 self.pull_model(self.chat_model)
             else:
-                print(f"✅ Chat model available: {self.chat_model}")
+                self.log(f"✅ Chat model available: {self.chat_model}")
                 
         except Exception as e:
-            print(f"❌ Ollama connection error: {e}")
-            print("\n📌 Please ensure:")
-            print("  1. Ollama is installed (https://ollama.ai)")
-            print("  2. Ollama is running (ollama serve)")
-            print("  3. You have pulled the required models:")
-            print(f"     ollama pull {self.embedding_model}")
-            print(f"     ollama pull {self.chat_model}")
+            self.log(f"❌ Ollama connection error: {e}")
+            self.log("\n📌 Please ensure:")
+            self.log("  1. Ollama is installed (https://ollama.ai)")
+            self.log("  2. Ollama is running (ollama serve)")
+            self.log("  3. You have pulled the required models:")
+            self.log(f"     ollama pull {self.embedding_model}")
+            self.log(f"     ollama pull {self.chat_model}")
             sys.exit(1)
     
     def pull_model(self, model_name):
         """
         Pull an Ollama model using the Python API client
         """
-        print(f"⬇️ Pulling {model_name}... This may take a few minutes...")
+        self.log(f"⬇️ Pulling {model_name}... This may take a few minutes...")
         
         try:
             # Connect directly via the Python client API
@@ -121,22 +143,22 @@ class AECRAG:
             
             # Using client.pull directly bypasses the need for the 'ollama' CLI binary
             response = client.pull(model=model_name)
-            print(f"✅ Successfully pulled {model_name}")
+            self.log(f"✅ Successfully pulled {model_name}")
             return True
                 
         except Exception as e:
-            print(f"❌ Error pulling {model_name} via API: {e}")
+            self.log(f"❌ Error pulling {model_name} via API: {e}")
             return False
     
     def load_data_from_file(self):
         """
         Load project data from Excel file on C drive
         """
-        print(f"📂 Loading data from: {self.data_file_path}")
+        self.log(f"📂 Loading data from: {self.data_file_path}")
         
         if not os.path.exists(self.data_file_path):
-            print(f"❌ File not found: {self.data_file_path}")
-            print("📝 Creating sample data file as template...")
+            self.log(f"❌ File not found: {self.data_file_path}")
+            self.log("📝 Creating sample data file as template...")
             self.create_template_file()
             return True
         
@@ -145,25 +167,25 @@ class AECRAG:
             
             if file_ext in ['.xlsx', '.xls']:
                 self.projects_df = pd.read_excel(self.data_file_path)
-                print(f"✅ Loaded Excel file with {len(self.projects_df)} records")
+                self.log(f"✅ Loaded Excel file with {len(self.projects_df)} records")
                 
             elif file_ext == '.csv':
                 self.projects_df = pd.read_csv(self.data_file_path)
-                print(f"✅ Loaded CSV file with {len(self.projects_df)} records")
+                self.log(f"✅ Loaded CSV file with {len(self.projects_df)} records")
                 
             else:
-                print(f"❌ Unsupported file type: {file_ext}")
+                self.log(f"❌ Unsupported file type: {file_ext}")
                 return False
             
             if self.validate_data():
-                print("✅ Data validation passed!")
+                self.log("✅ Data validation passed!")
                 return True
             else:
-                print("❌ Data validation failed.")
+                self.log("❌ Data validation failed.")
                 return False
                 
         except Exception as e:
-            print(f"❌ Error loading file: {str(e)}")
+            self.log(f"❌ Error loading file: {str(e)}")
             traceback.print_exc()
             return False
     
@@ -171,7 +193,7 @@ class AECRAG:
         """
         Create a template Excel file with sample data
         """
-        print("📝 Creating template file with sample data...")
+        self.log("📝 Creating template file with sample data...")
         
         sample_data = self.generate_sample_data(50)
         
@@ -179,8 +201,8 @@ class AECRAG:
         os.makedirs(os.path.dirname(self.data_file_path), exist_ok=True)
         sample_data.to_excel(self.data_file_path, index=False)
         
-        print(f"✅ Template file created at: {self.data_file_path}")
-        print("📌 Please update this file with your actual project data")
+        self.log(f"✅ Template file created at: {self.data_file_path}")
+        self.log("📌 Please update this file with your actual project data")
         
         self.projects_df = sample_data
         return True
@@ -189,7 +211,7 @@ class AECRAG:
         """
         Generate sample project data with realistic values
         """
-        print(f"📊 Generating {num_projects} sample projects...")
+        self.log(f"📊 Generating {num_projects} sample projects...")
         
         projects = []
         statuses = ['Planning', 'In Progress', 'Review', 'Completed', 'On Hold']
@@ -220,7 +242,7 @@ class AECRAG:
             projects.append(project)
         
         df = pd.DataFrame(projects)
-        print(f"✅ Generated {len(df)} sample projects")
+        self.log(f"✅ Generated {len(df)} sample projects")
         return df
     
     def validate_data(self):
@@ -238,12 +260,12 @@ class AECRAG:
                 missing_columns.append(col)
         
         if missing_columns:
-            print(f"❌ Missing required columns: {missing_columns}")
-            print("📌 Required columns: project_id, project_name, status, budget, actual_cost, completion_percentage")
+            self.log(f"❌ Missing required columns: {missing_columns}")
+            self.log("📌 Required columns: project_id, project_name, status, budget, actual_cost, completion_percentage")
             return False
         
         if len(self.projects_df) == 0:
-            print("❌ No data found in file")
+            self.log("❌ No data found in file")
             return False
         
         return True
@@ -252,7 +274,7 @@ class AECRAG:
         """
         Prepare documents from project data for embedding
         """
-        print("📝 Preparing documents for indexing...")
+        self.log("📝 Preparing documents for indexing...")
         
         documents = []
         metadatas = []
@@ -285,21 +307,21 @@ class AECRAG:
             })
             ids.append(row.get('project_id', f'PRJ-{idx}'))
         
-        print(f"✅ Prepared {len(documents)} documents")
+        self.log(f"✅ Prepared {len(documents)} documents")
         return documents, metadatas, ids
     
     def generate_embeddings(self, texts):
         """
         Generate embeddings using Ollama with error handling
         """
-        print("🧠 Generating embeddings using Ollama...")
+        self.log("🧠 Generating embeddings using Ollama...")
         embeddings = []
         total = len(texts)
         
         for i, text in enumerate(texts):
             try:
                 if (i + 1) % 10 == 0 or i == total - 1:
-                    print(f"  Processing {i+1}/{total}...")
+                    self.log(f"  Processing {i+1}/{total}...")
                 
                 response = ollama.embeddings(
                     model=self.embedding_model,
@@ -308,21 +330,21 @@ class AECRAG:
                 embeddings.append(response['embedding'])
                 
             except Exception as e:
-                print(f"⚠️ Error generating embedding for document {i}: {e}")
+                self.log(f"⚠️ Error generating embedding for document {i}: {e}")
                 # Use zero vector as fallback
                 embeddings.append([0.0] * 768)
         
-        print(f"✅ Generated {len(embeddings)} embeddings")
+        self.log(f"✅ Generated {len(embeddings)} embeddings")
         return embeddings
     
     def index_projects(self):
         """
         Main indexing function - prepare and store project data
         """
-        print("📚 Indexing projects into vector database...")
+        self.log("📚 Indexing projects into vector database...")
         
         if self.projects_df is None or len(self.projects_df) == 0:
-            print("❌ No data to index")
+            self.log("❌ No data to index")
             return False
         
         try:
@@ -334,9 +356,9 @@ class AECRAG:
                 existing_data = self.collection.get()
                 if existing_data and existing_data['ids']:
                     self.collection.delete(ids=existing_data['ids'])
-                    print(f"🗑️ Cleared {len(existing_data['ids'])} existing documents")
+                    self.log(f"🗑️ Cleared {len(existing_data['ids'])} existing documents")
             except Exception as e:
-                print(f"Note: {e}")
+                self.log(f"Note: {e}")
             
             # Add to ChromaDB
             self.collection.add(
@@ -345,11 +367,11 @@ class AECRAG:
                 metadatas=metadatas,
                 ids=ids
             )
-            print(f"✅ Successfully indexed {len(documents)} projects")
+            self.log(f"✅ Successfully indexed {len(documents)} projects")
             return True
             
         except Exception as e:
-            print(f"❌ Error indexing projects: {e}")
+            self.log(f"❌ Error indexing projects: {e}")
             traceback.print_exc()
             return False
     
@@ -359,7 +381,7 @@ class AECRAG:
         Returns up to 100 projects by default
         Special handling for status queries
         """
-        print(f"🔍 Processing query: '{question}'")
+        self.log(f"🔍 Processing query: '{question}'")
         
         try:
             # Check if the question is asking about a specific status
@@ -374,13 +396,13 @@ class AECRAG:
             
             # If a status is detected and we have data, filter by status
             if detected_status and self.projects_df is not None:
-                print(f"📊 Detected status filter: {detected_status}")
+                self.log(f"📊 Detected status filter: {detected_status}")
                 filtered_df = self.projects_df[
                     self.projects_df['status'].str.lower() == detected_status
                 ]
                 
                 if len(filtered_df) > 0:
-                    print(f"✅ Found {len(filtered_df)} {detected_status} projects")
+                    self.log(f"✅ Found {len(filtered_df)} {detected_status} projects")
                     
                     # Create detailed context from filtered projects
                     context = f"Found {len(filtered_df)} {detected_status} projects:\n\n"
@@ -423,7 +445,7 @@ class AECRAG:
                     prompt=question
                 )['embedding']
             except Exception as e:
-                print(f"❌ Error generating query embedding: {e}")
+                self.log(f"❌ Error generating query embedding: {e}")
                 return {
                     'question': question,
                     'response': f"Error: {str(e)}",
@@ -457,7 +479,7 @@ class AECRAG:
             }
             
         except Exception as e:
-            print(f"❌ Error processing query: {e}")
+            self.log(f"❌ Error processing query: {e}")
             traceback.print_exc()
             return {
                 'question': question,
@@ -575,20 +597,21 @@ Answer:"""
         
         return stats
 
+    
 # ==================== INITIALIZE SYSTEM ====================
 
-print("🏗️ Initializing AEC-RAG Web Interface...")
+# self.log("🏗️ Initializing AEC-RAG Web Interface...")
 rag = AECRAG("C:/AEC_Projects/project_data.xlsx")
 
 if not rag.load_data_from_file():
-    print("❌ Could not load data")
+    self.log("❌ Could not load data")
     sys.exit(1)
 
 if not rag.index_projects():
-    print("❌ Could not index projects")
+    self.log("❌ Could not index projects")
     sys.exit(1)
 
-print("✅ System ready!")
+rag.log("✅ System ready!")
 
 # ==================== HTML TEMPLATE ====================
 
@@ -869,7 +892,7 @@ def api_query():
         return jsonify(result)
         
     except Exception as e:
-        print(f"❌ API Error: {e}")
+        self.log(f"❌ API Error: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -892,21 +915,22 @@ def api_stats():
         return jsonify(stats)
         
     except Exception as e:
-        print(f"❌ Stats Error: {e}")
+        self.log(f"❌ Stats Error: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
 
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
-    print("\n" + "="*60)
-    print("🌐 AEC-RAG Web Interface")
-    print("="*60)
-    print(f"📍 URL: http://localhost:5000")
-    print(f"📁 Data: {rag.data_file_path}")
-    print(f"📊 Projects: {len(rag.projects_df) if rag.projects_df is not None else 0}")
-    print("="*60)
-    print("\n🚀 Starting web server...")
-    print("Press Ctrl+C to stop\n")
+    rag.log("\n" + "="*60)
+    rag.log("🌐 AEC-RAG Web Interface")
+    rag.log("="*60)
+    rag.log(f"📍 URL: http://localhost:5000")
+    rag.log(f"📁 Data: {rag.data_file_path}")
+    rag.log(f"📊 Projects: {len(rag.projects_df) if rag.projects_df is not None else 0}")
+    rag.log("="*60)
+    rag.log("\n🚀 Starting web server...")
+    rag.log("Press Ctrl+C to stop\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)

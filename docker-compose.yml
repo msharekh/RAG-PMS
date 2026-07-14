@@ -23,6 +23,16 @@ services:
       - ollama
     # This force-waits a few seconds to let the main Ollama service initialize its socket before Python runs
     command: sh -c "sleep 8 && python aec_rag_web_excel.py"
+    # command: >
+    #   sh -c "
+    #       until curl -s http://ollama:11434/api/tags > /dev/null;
+    #       do
+    #         echo 'Waiting for Ollama...';
+    #         sleep 2;
+    #       done;
+    #       python aec_rag_web_excel.py
+    #       "
+    
 
 volumes:
   ollama_storage:

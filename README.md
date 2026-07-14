@@ -900,10 +900,22 @@ exit         # Quit
 1. LangChain - Framework for RAG pipeline (optional but helpful)
 1. Pandas - Data manipulation
 
-
+.................................................
 pip install ollama chromadb pandas langchain langchain-community sentence-transformers
 pip show <package_name>
-pip show ollama chromadb pandas langchain langchain-community sentence-transformers flask
+
+
+pip show ollama chromadb pandas langchain langchain-community sentence-transformers flask openpyxl flask_cors
+
+.venv\Scripts\python.exe -m pip install flask_cors
+
+Verify it's installed
+
+Run:
+
+.venv\Scripts\python.exe -m pip show pandas
+.................................................
+
 
 packages:
 
@@ -1062,3 +1074,20 @@ Once the console logs indicate completion, open any browser on the destination m
 
 ✅ Embedding model available: nomic-embed-text
 ✅ Chat model available: llama3.2:latest
+
+
+================common issue==============
+when debugging
+some packages not installed in virtual environment
+
+activate the environment first:
+.venv\Scripts\activate
+
+.venv\Scripts\python.exe -m pip install pandas
+.venv\Scripts\python.exe -m pip install flask_cors
+
+Verify it's installed
+
+Run:
+
+.venv\Scripts\python.exe -m pip show pandas
