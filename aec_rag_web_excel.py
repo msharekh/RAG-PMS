@@ -327,6 +327,12 @@ class AECRAG:
         documents.append(text)
         self.log(f"Prepared {len(documents)} documents")
 
+        metadatas.append({
+            "row": str(idx)
+        })
+
+        ids.append(f"row_{idx}")
+
         return documents, metadatas, ids
     
     def generate_embeddings(self, texts):
@@ -369,7 +375,9 @@ class AECRAG:
         
         try:
             documents, metadatas, ids = self.prepare_documents()
-
+            self.log(len(documents))
+            self.log(len(metadatas))
+            self.log(len(ids))
 
             embeddings = self.generate_embeddings(documents)
             
