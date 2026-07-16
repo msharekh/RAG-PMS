@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Excel RAG with Ollama</title>
+    <style>body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }</style>
+</head>
+<body>
+    <h2>1. Upload Excel Sheet</h2>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".xlsx, .xls">
+        <button type="submit">Ingest Data</button>
+    </form>
+
+    <h2>2. Ask a Question</h2>
+    <form id="askForm">
+        <input type="text" id="query" placeholder="e.g., What is the total revenue?" style="width: 80%;">
+        <button type="submit">Ask</button>
+    </form>
+    <h3>Answer:</h3>
+    <p id="answer" style="white-space: pre-wrap; background: #f4f4f4; padding: 15px; border-radius: 5px;"></p>
+
+    <script>
+        document.getElementById('askForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const query = document.getElementById('query').value;
+            document.getElementById('answer').innerText = "Thinking...";
+            
+            const response = await fetch('/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query })
+            });
+            const data = await response.json();
+            document.getElementById('answer').innerText = data.answer || data.error;
+        };
+    </script>
+</body>
+</html>
